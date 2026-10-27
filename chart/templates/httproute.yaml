@@ -13,6 +13,8 @@ metadata:
     # be ready yet, and a failed apply in an earlier wave fails the sync, so Argo CD retries it,
     # instead of leaving the sync waiting for pods that can't start.
     argocd.argoproj.io/sync-wave: "-1"
+    # A clickable link in Argo CD (on the app tile and this route): it finds none on HTTPRoutes.
+    link.argocd.argoproj.io/external-link: {{ printf "http://%s.%s%s" $g.app $g.domain .path }}
 spec:
   parentRefs:
     - group: gateway.networking.k8s.io
