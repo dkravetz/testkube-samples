@@ -9,10 +9,8 @@ metadata:
   labels:
     {{- include "app.labels" (dict "root" $ "name" $name) | nindent 4 }}
   annotations:
-    # Applied before the Deployments (wave -1): on a fresh cluster this kind's CRD or webhook may not
-    # be ready yet, and a failed apply in an earlier wave fails the sync, so Argo CD retries it,
-    # instead of leaving the sync waiting for pods that can't start.
-    argocd.argoproj.io/sync-wave: "-1"
+    # No sync wave: Argo CD counts a route Degraded until its Service exists, so in an earlier
+    # wave than the Services it blocks the sync on a fresh cluster.
     # A clickable link in Argo CD (on the app tile and this route): it finds none on HTTPRoutes.
     link.argocd.argoproj.io/external-link: {{ printf "http://%s.%s%s" $g.app $g.domain .path }}
 spec:

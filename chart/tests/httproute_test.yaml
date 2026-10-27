@@ -23,6 +23,11 @@ tests:
             - example.prd.localhost
             - example.prd.internal
 
+  - it: syncs in the same wave as the Services it routes to
+    asserts:
+      - notExists:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+
   - it: strips a path prefix with a URLRewrite
     documentSelector:
       path: metadata.name
