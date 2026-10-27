@@ -44,5 +44,7 @@ jobs:
               --set "global.env=$env" --set "global.domain=$env.localhost" > /dev/null
           done
 
+      # helm-unittest creates chart/tests/__snapshot__, so it runs as the owner of the checkout
+      # (the image's own user can't write there), with a HOME it can write to.
       - name: helm-unittest
-        run: docker run --rm -v "$PWD/chart:/apps" "$HELM_IMAGE" .
+        run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/chart:/apps" "$HELM_IMAGE" .
