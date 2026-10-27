@@ -107,11 +107,11 @@
           },
           "revision": {
             "type": "string",
-            "description": "The git ref this env runs (Argo CD's ApplicationSet reads it from app.yaml on main). Default main."
+            "description": "The git ref this env runs, or a semver range over its tags such as \">=0.1.0\" (Argo CD's ApplicationSet reads it from app.yaml on main). Default main."
           },
           "tests": {
             "type": "boolean",
-            "description": "Render this env's TestWorkflows. Default true."
+            "description": "Render this env's TestWorkflows, and the Job that runs them after each sync and releases the commit when they pass. Default true."
           }
         }
       }

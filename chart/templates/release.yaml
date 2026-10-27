@@ -1,0 +1,133 @@
+{{- $g := .Values.global }}
+{{- $envConfig := include "app.envConfig" . | fromYaml }}
+{{- if (hasKey $envConfig "tests" | ternary $envConfig.tests true) }}
+{{- $workflows := list }}
+{{- range $name, $c := include "app.components" . | fromYaml }}
+{{- range $c.tests }}
+{{- $workflows = append $workflows (printf "%s-%s-%s-%s" $g.app $g.env $name .name) }}
+{{- end }}
+{{- end }}
+{{- with $workflows }}
+{{- $repo := $g.repository | trimPrefix "https://github.com/" | trimSuffix ".git" }}
+---
+# The platform's GitHub App (Secrets Manager platform/github-app, from
+# testkube-samples-infrastructure), for the token below.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: github-app
+  labels:
+    {{- include "app.labels" (dict "root" $ "name" "release") | nindent 4 }}
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: aws
+  target:
+    name: github-app
+    creationPolicy: Owner
+  dataFrom:
+    - extract:
+        key: platform/github-app
+---
+# An installation token for this repo only, allowed to send the repository_dispatch below.
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: GithubAccessToken
+metadata:
+  name: github
+  labels:
+    {{- include "app.labels" (dict "root" $ "name" "release") | nindent 4 }}
+spec:
+  appIDRef:
+    name: github-app
+    key: appId
+  installIDRef:
+    name: github-app
+    key: installationId
+  auth:
+    privateKey:
+      secretRef:
+        name: github-app
+        key: privateKey
+  repositories:
+    - {{ base $repo }}
+  permissions:
+    contents: write
+---
+# Installation tokens last an hour: a fresh one every 30 minutes.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: github-token
+  labels:
+    {{- include "app.labels" (dict "root" $ "name" "release") | nindent 4 }}
+spec:
+  refreshInterval: 30m
+  target:
+    name: github-token
+    creationPolicy: Owner
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: GithubAccessToken
+          name: github
+---
+# After every sync, once the new pods are healthy: run this env's TestWorkflows one by one, and
+# when all of them pass, ask GitHub to release the commit they ran against (the repo's release
+# workflow tags it and its images with the next version). A failed test fails the Job, and with it
+# the sync, so nothing is released.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-%s-release" $g.app $g.env }}
+  labels:
+    {{- include "app.labels" (dict "root" $ "name" "release") | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "app.selectorLabels" (dict "root" $ "name" "release") | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      initContainers:
+        {{- range . }}
+        - name: {{ trunc 63 . }}
+          image: kubeshop/testkube-cli:2.14.2
+          # The testkube add-on's API (no auth); exits non-zero unless the execution passes.
+          args:
+            - run
+            - testworkflow
+            - {{ . }}
+            - --watch
+            - --client=direct
+            - --api-uri=http://testkube-api-server.testkube.svc.cluster.local:8088
+        {{- end }}
+      containers:
+        - name: dispatch
+          image: curlimages/curl:8.17.0
+          env:
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: github-token
+                  key: token
+          args:
+            - --fail-with-body
+            - --silent
+            - --show-error
+            - --request
+            - POST
+            - --header
+            - "Authorization: Bearer $(GITHUB_TOKEN)"
+            - --header
+            - "Accept: application/vnd.github+json"
+            - --data
+            - {{ dict "event_type" "tests-passed" "client_payload" (dict "sha" ($g.revision | toString)) | toJson | quote }}
+            - {{ printf "https://api.github.com/repos/%s/dispatches" $repo }}
+{{- end }}
+{{- end }}

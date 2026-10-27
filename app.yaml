@@ -38,6 +38,8 @@ components:
 envs:
   dev: {}
   prd:
+    # The latest release: dev's tests passing on a commit releases it (.github/workflows/release.yaml).
+    revision: ">=0.1.0"
     # Testkube tests dev only; prd runs a revision that already passed there.
     tests: false
     components:
