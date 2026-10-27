@@ -1,0 +1,17 @@
+{{- range $name, $c := include "app.components" . | fromYaml }}
+{{- if ($c.pdb).enabled }}
+{{- $ctx := dict "root" $ "name" $name }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "app.labels" $ctx | nindent 4 }}
+spec:
+  minAvailable: {{ $c.pdb.minAvailable | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" $ctx | nindent 6 }}
+{{- end }}
+{{- end }}

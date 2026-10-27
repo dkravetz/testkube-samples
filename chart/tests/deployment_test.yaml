@@ -1,0 +1,134 @@
+suite: deployment
+values:
+  - values/app.yaml
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: renders one Deployment per component
+    asserts:
+      - hasDocuments:
+          count: 2
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: api
+          any: true
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: web
+          any: true
+
+  - it: uses the global image tag and the component's port
+    set:
+      global.image.tag: sha-abc1234
+    documentSelector:
+      path: metadata.name
+      value: api
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/example/example-api:sha-abc1234
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8080
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: lets a component override the image tag
+    set:
+      global.image.tag: sha-abc1234
+      components.web.image.tag: pinned
+    documentSelector:
+      path: metadata.name
+      value: web
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/example/example-web:pinned
+
+  - it: reads DB_* from the database Secret only when database is set
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+          value: api-db
+        documentSelector:
+          path: metadata.name
+          value: api
+      - notExists:
+          path: spec.template.spec.containers[0].envFrom
+        documentSelector:
+          path: metadata.name
+          value: web
+
+  - it: probes healthPath over HTTP, otherwise the TCP port
+    set:
+      components.web.healthPath: null
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /hello
+        documentSelector:
+          path: metadata.name
+          value: api
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.tcpSocket.port
+          value: http
+        documentSelector:
+          path: metadata.name
+          value: web
+
+  - it: renders extra env vars as strings
+    set:
+      components.web.env:
+        LOG_LEVEL: debug
+        WORKERS: 2
+    documentSelector:
+      path: metadata.name
+      value: web
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WORKERS
+            value: "2"
+
+  - it: sets replicas from values-prd.yaml
+    values:
+      - values/prd.yaml
+    documentSelector:
+      path: metadata.name
+      value: api
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+
+  - it: leaves replicas to the HPA when it is enabled
+    set:
+      components.api.hpa:
+        enabled: true
+        maxReplicas: 4
+    documentSelector:
+      path: metadata.name
+      value: api
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: selects its own pods
+    documentSelector:
+      path: metadata.name
+      value: api
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/part-of: example
+            app.kubernetes.io/component: api
+      - isSubset:
+          path: spec.template.metadata.labels
+          content:
+            app.kubernetes.io/part-of: example
+            app.kubernetes.io/component: api

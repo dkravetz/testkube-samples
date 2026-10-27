@@ -1,0 +1,3 @@
+# Which revision dev runs; Argo CD's apps ApplicationSet deploys it. The build workflow will
+# write the tested commit's full sha here; until then dev follows main.
+revision: main

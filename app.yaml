@@ -1,5 +1,49 @@
-# How this app runs on the platform. Merged to main = dev; a GitHub release = prd.
+# How this app runs on the platform, the one file the team edits. Merged to main = dev; a GitHub
+# release = prd. Terrakube reads `infrastructure`; Argo CD passes the whole file to the platform's
+# base-app chart (chart/), whose values.schema.json lists every field.
+
 infrastructure:
   # OpenTofu for the app's cloud resources, applied by the platform's Terrakube workspaces
   # testkube-samples-dev and testkube-samples-prd.
   path: infrastructure
+
+components:
+  api:
+    image:
+      repository: ghcr.io/dkravetz/testkube-samples-api
+    port: 8080
+    healthPath: /hello
+    route:
+      path: /api # served at /api, stripped before it reaches the container
+    database: main # DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD from apps/<app>/<env>/db/main
+    tests:
+      - name: hurl
+        type: hurl
+        path: apps/api/tests
+
+  web:
+    image:
+      repository: ghcr.io/dkravetz/testkube-samples-web
+    port: 4173
+    healthPath: /
+    route:
+      path: /
+    tests:
+      - name: e2e
+        type: cypress
+        path: apps/web
+
+# Per env, merged over `components`.
+envs:
+  prd:
+    # Testkube tests dev only; prd runs a revision that already passed there.
+    tests: false
+    components:
+      api:
+        replicas: 2
+        pdb:
+          enabled: true
+      web:
+        replicas: 2
+        pdb:
+          enabled: true

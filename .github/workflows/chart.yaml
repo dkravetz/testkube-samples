@@ -1,0 +1,48 @@
+name: chart
+
+on:
+  pull_request:
+    paths:
+      - app.yaml
+      - chart/**
+      - .github/workflows/chart.yaml
+
+permissions:
+  contents: read
+
+env:
+  # Helm 4.3.0 with helm-unittest 1.2.1: one image for lint and tests, the same one used locally.
+  HELM_IMAGE: helmunittest/helm-unittest:4.3.0-1.2.1
+  # What Argo CD's apps ApplicationSet sets besides the env: the app's registry name (this
+  # repo's name) and this repo's URL.
+  GLOBALS: >-
+    --set global.app=${{ github.event.repository.name }}
+    --set global.repository=${{ github.event.repository.html_url }}
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The base-app chart with this app's app.yaml, as Argo CD renders it per env.
+      - name: helm lint
+        run: |
+          for env in dev prd; do
+            # shellcheck disable=SC2086 # GLOBALS is a list of flags
+            docker run --rm -v "$PWD:/repo" -w /repo --entrypoint helm "$HELM_IMAGE" \
+              lint --strict chart -f app.yaml $GLOBALS \
+              --set "global.env=$env" --set "global.domain=$env.localhost"
+          done
+
+      - name: helm template
+        run: |
+          for env in dev prd; do
+            # shellcheck disable=SC2086 # GLOBALS is a list of flags
+            docker run --rm -v "$PWD:/repo" -w /repo --entrypoint helm "$HELM_IMAGE" \
+              template "${{ github.event.repository.name }}" chart -f app.yaml $GLOBALS \
+              --set "global.env=$env" --set "global.domain=$env.localhost" > /dev/null
+          done
+
+      - name: helm-unittest
+        run: docker run --rm -v "$PWD/chart:/apps" "$HELM_IMAGE" .

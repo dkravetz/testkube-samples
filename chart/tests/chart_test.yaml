@@ -1,0 +1,116 @@
+suite: whole chart
+values:
+  - values/app.yaml
+templates:
+  - templates/deployment.yaml
+  - templates/service.yaml
+  - templates/httproute.yaml
+  - templates/externalsecret.yaml
+  - templates/testworkflow.yaml
+  - templates/pdb.yaml
+  - templates/hpa.yaml
+tests:
+  - it: never renders an Ingress or a LoadBalancer Service, in any env
+    values:
+      - values/prd.yaml
+    set:
+      components.api.hpa:
+        enabled: true
+        maxReplicas: 3
+    asserts:
+      - containsDocument:
+          kind: Ingress
+          apiVersion: networking.k8s.io/v1
+        not: true
+      - notEqual:
+          path: spec.type
+          value: LoadBalancer
+        template: templates/service.yaml
+
+  - it: renders a new component from values alone
+    set:
+      components.worker:
+        image:
+          repository: ghcr.io/example/example-worker
+        port: 9000
+    asserts:
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: worker
+          any: true
+        template: templates/deployment.yaml
+      - containsDocument:
+          kind: Service
+          apiVersion: v1
+          name: worker
+          any: true
+        template: templates/service.yaml
+
+  - it: rejects a component without an image
+    set:
+      components.worker.port: 9000
+    asserts:
+      - failedTemplate:
+          errorPattern: "missing property 'image'"
+
+  - it: requires the app to set global.app and global.repository
+    set:
+      global.app: ""
+      global.repository: ""
+    asserts:
+      - failedTemplate: {}
+
+  - it: merges envs.<env>.components over components, keeping the rest
+    values:
+      - values/prd.yaml
+    template: templates/deployment.yaml
+    documentSelector:
+      path: metadata.name
+      value: api
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/example/example-api:latest
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8080
+
+  - it: ignores another env's overrides
+    template: templates/deployment.yaml
+    documentSelector:
+      path: metadata.name
+      value: api
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: rejects an override for a component that does not exist
+    set:
+      envs.prd.components.worker.replicas: 3
+      global.env: prd
+    # Helm stops at the first template that fails, and reports the error there.
+    template: templates/service.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "envs.prd.components.worker: no such component"
+
+  - it: renders no TestWorkflows when the env sets tests false
+    set:
+      envs.dev.tests: false
+    template: templates/testworkflow.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: rejects an unknown top-level key
+    set:
+      api:
+        port: 1
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'api' not allowed"

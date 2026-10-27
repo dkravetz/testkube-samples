@@ -1,0 +1,55 @@
+{{- range $name, $c := include "app.components" . | fromYaml }}
+{{- $ctx := dict "root" $ "name" $name }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "app.labels" $ctx | nindent 4 }}
+spec:
+  {{- if not ($c.hpa).enabled }}
+  replicas: {{ $c.replicas | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "app.labels" $ctx | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: {{ $name }}
+          image: {{ printf "%s:%s" $c.image.repository ($c.image.tag | default $.Values.global.image.tag) }}
+          ports:
+            - name: http
+              containerPort: {{ $c.port }}
+              protocol: TCP
+          {{- with $c.env }}
+          env:
+            {{- range $k, $v := . }}
+            - name: {{ $k }}
+              value: {{ $v | toString | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if $c.database }}
+          envFrom:
+            - secretRef:
+                name: {{ include "app.dbSecretName" $name }}
+          {{- end }}
+          {{- $probe := dict "tcpSocket" (dict "port" "http") }}
+          {{- with $c.healthPath }}
+          {{- $probe = dict "httpGet" (dict "path" . "port" "http") }}
+          {{- end }}
+          readinessProbe:
+            {{- toYaml $probe | nindent 12 }}
+            periodSeconds: 5
+          livenessProbe:
+            {{- toYaml $probe | nindent 12 }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml ($c.resources | default (dict "requests" (dict "cpu" "50m" "memory" "128Mi") "limits" (dict "memory" "256Mi"))) | nindent 12 }}
+{{- end }}

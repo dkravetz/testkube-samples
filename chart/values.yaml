@@ -1,0 +1,21 @@
+# Defaults for base-app. An app's values are its app.yaml (infrastructure, components, envs);
+# Argo CD's apps ApplicationSet passes it and sets `global`. values.schema.json lists every field.
+
+global:
+  app: "" # the app's name in the platform's registry (apps.yaml)
+  env: dev
+  domain: dev.localhost
+  repository: "" # git URL the tests are checked out from: the app repo
+  revision: main # placeholder: the ApplicationSet sets $ARGOCD_APP_REVISION
+  image:
+    tag: latest # placeholder: the ApplicationSet sets sha-$ARGOCD_APP_REVISION_SHORT
+
+# Read by Terrakube (where the app's OpenTofu is); the chart ignores it.
+infrastructure: {}
+
+# One Deployment and Service each, plus a route, a database and tests when they are set.
+components: {}
+
+# Per env (dev, prd): `components` merged over the ones above, and `tests: false` to render no
+# TestWorkflows.
+envs: {}

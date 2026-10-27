@@ -1,0 +1,81 @@
+suite: testworkflow
+values:
+  - values/app.yaml
+templates:
+  - templates/testworkflow.yaml
+tests:
+  - it: renders one TestWorkflow per test, in Testkube's namespace
+    set:
+      global.revision: 0123456789abcdef0123456789abcdef01234567
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isAPIVersion:
+          of: testworkflows.testkube.io/v1
+      - isKind:
+          of: TestWorkflow
+      - equal:
+          path: metadata.namespace
+          value: testkube
+      - equal:
+          path: spec.use[0].config.revision
+          value: 0123456789abcdef0123456789abcdef01234567
+
+  - it: runs hurl against the api's internal route
+    documentSelector:
+      path: metadata.name
+      value: example-dev-api-hurl
+    asserts:
+      - equal:
+          path: spec.use
+          value:
+            - name: hurl
+              config:
+                repo: https://github.com/example/example
+                revision: main
+                path: apps/api/tests
+                origin: http://example.dev.internal/api
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: example-dev
+
+  - it: runs cypress against the web's internal route
+    documentSelector:
+      path: metadata.name
+      value: example-dev-web-e2e
+    asserts:
+      - equal:
+          path: spec.use[0].name
+          value: cypress
+      - equal:
+          path: spec.use[0].config.origin
+          value: http://example.dev.internal
+
+  - it: targets the Service when the component has no route
+    release:
+      namespace: example-dev
+    set:
+      components.api.route: null
+    documentSelector:
+      path: metadata.name
+      value: example-dev-api-hurl
+    asserts:
+      - equal:
+          path: spec.use[0].config.origin
+          value: http://api.example-dev.svc.cluster.local:8080
+
+  - it: renders nothing in prd
+    values:
+      - values/prd.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: rejects an unknown test type
+    set:
+      components.api.tests:
+        - name: load
+          type: k6
+          path: apps/api
+    asserts:
+      - failedTemplate: {}
