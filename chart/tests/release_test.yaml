@@ -1,0 +1,48 @@
+suite: release
+values:
+  - values/app.yaml
+templates:
+  - templates/release.yaml
+tests:
+  - it: runs every TestWorkflow after the sync, then dispatches the tested commit
+    set:
+      global.revision: 0123456789abcdef0123456789abcdef01234567
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PostSync
+      - equal:
+          path: spec.template.spec.initContainers[0].args[2]
+          value: example-dev-api-hurl
+      - equal:
+          path: spec.template.spec.initContainers[1].args[2]
+          value: example-dev-web-e2e
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: '{"client_payload":{"sha":"0123456789abcdef0123456789abcdef01234567"},"event_type":"tests-passed"}'
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: https://api.github.com/repos/example/example/dispatches
+
+  - it: mints a token for this repo only, with the platform's GitHub App
+    documentSelector:
+      path: kind
+      value: GithubAccessToken
+    asserts:
+      - equal:
+          path: spec.repositories
+          value: [example]
+      - equal:
+          path: spec.permissions
+          value:
+            contents: write
+
+  - it: renders nothing in prd
+    values:
+      - values/prd.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
