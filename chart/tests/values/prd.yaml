@@ -1,0 +1,4 @@
+# What the ApplicationSet sets for prd.
+global:
+  env: prd
+  domain: prd.localhost

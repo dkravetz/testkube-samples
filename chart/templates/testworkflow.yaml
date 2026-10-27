@@ -1,0 +1,26 @@
+{{- $g := .Values.global }}
+{{- $envConfig := include "app.envConfig" . | fromYaml }}
+{{- if (hasKey $envConfig "tests" | ternary $envConfig.tests true) }}
+{{- range $name, $c := include "app.components" . | fromYaml }}
+{{- range $c.tests }}
+---
+# Lives in Testkube's namespace: a standalone agent reads TestWorkflows only from its own.
+apiVersion: testworkflows.testkube.io/v1
+kind: TestWorkflow
+metadata:
+  name: {{ printf "%s-%s-%s-%s" $g.app $g.env $name .name }}
+  namespace: testkube
+  labels:
+    {{- include "app.labels" (dict "root" $ "name" $name) | nindent 4 }}
+spec:
+  use:
+    # TestWorkflowTemplate from the testkube add-on in testkube-samples-infrastructure.
+    - name: {{ .type }}
+      config:
+        repo: {{ required "global.repository is required for tests" $g.repository }}
+        revision: {{ $g.revision | toString | quote }}
+        path: {{ .path }}
+        origin: {{ include "app.origin" (dict "root" $ "name" $name "component" $c) }}
+{{- end }}
+{{- end }}
+{{- end }}

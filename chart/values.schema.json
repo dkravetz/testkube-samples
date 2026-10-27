@@ -1,0 +1,347 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "testkube-samples chart values",
+  "description": "An app's values are its app.yaml; Argo CD's apps ApplicationSet sets `global`.",
+  "type": "object",
+  "required": [
+    "global"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "global": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "app",
+        "env",
+        "domain",
+        "revision",
+        "image"
+      ],
+      "properties": {
+        "app": {
+          "$ref": "#/definitions/dnsLabel",
+          "description": "The app's name in the platform's registry: hostnames, secret paths, labels."
+        },
+        "env": {
+          "type": "string",
+          "enum": [
+            "dev",
+            "prd"
+          ]
+        },
+        "domain": {
+          "type": "string",
+          "enum": [
+            "dev.localhost",
+            "prd.localhost"
+          ],
+          "description": "Browser hostname is <app>.<domain>."
+        },
+        "repository": {
+          "type": "string",
+          "pattern": "^(https://.*)?$",
+          "description": "Git URL the tests are checked out from; set by the ApplicationSet."
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Git revision the tests are checked out at."
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tag"
+          ],
+          "properties": {
+            "tag": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Image tag for every component, sha-<short>."
+            }
+          }
+        }
+      }
+    },
+    "infrastructure": {
+      "type": "object",
+      "description": "Read by Terrakube: where the app's OpenTofu is. Ignored by the chart.",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "description": "The app's components by name.",
+      "propertyNames": {
+        "$ref": "#/definitions/dnsLabel"
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/component"
+      }
+    },
+    "envs": {
+      "type": "object",
+      "description": "Per-env settings, merged over `components` for global.env.",
+      "propertyNames": {
+        "enum": [
+          "dev",
+          "prd"
+        ]
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "components": {
+            "type": "object",
+            "propertyNames": {
+              "$ref": "#/definitions/dnsLabel"
+            },
+            "additionalProperties": {
+              "$ref": "#/definitions/componentFields"
+            }
+          },
+          "tests": {
+            "type": "boolean",
+            "description": "Render this env's TestWorkflows. Default true."
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "dnsLabel": {
+      "type": "string",
+      "pattern": "^[a-z]([-a-z0-9]{0,30}[a-z0-9])?$"
+    },
+    "component": {
+      "description": "One container behind a ClusterIP Service. There is no Service type field: traffic from outside comes through the shared Gateway.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/componentFields"
+        },
+        {
+          "required": [
+            "image",
+            "port"
+          ]
+        }
+      ]
+    },
+    "resourceList": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "memory": {
+          "type": "string"
+        }
+      }
+    },
+    "componentFields": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository"
+          ],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Overrides global.image.tag for this component."
+            }
+          }
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Port the container listens on."
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Ignored when hpa.enabled. Default 1."
+        },
+        "healthPath": {
+          "description": "HTTP path for the probes; without it they open a TCP connection.",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^/"
+            }
+          ]
+        },
+        "env": {
+          "type": "object",
+          "description": "Extra environment variables, name to value.",
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requests": {
+              "$ref": "#/definitions/resourceList"
+            },
+            "limits": {
+              "$ref": "#/definitions/resourceList"
+            }
+          }
+        },
+        "route": {
+          "description": "Serve the component on the shared Gateway at this path. A path other than / is stripped before it reaches the container.",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^/([-a-zA-Z0-9_.]+(/[-a-zA-Z0-9_.]+)*)?$"
+                }
+              }
+            }
+          ]
+        },
+        "database": {
+          "description": "Database name: DB_* env vars from Secrets Manager apps/<app>/<env>/db/<database>.",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/dnsLabel"
+            }
+          ]
+        },
+        "tests": {
+          "description": "TestWorkflows to render, one per entry.",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "type",
+                  "path"
+                ],
+                "properties": {
+                  "name": {
+                    "$ref": "#/definitions/dnsLabel"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "hurl",
+                      "cypress"
+                    ]
+                  },
+                  "path": {
+                    "type": "string",
+                    "pattern": "^[^/]",
+                    "description": "Directory in the repo, relative to its root."
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "pdb": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "minAvailable": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "description": "Default 1."
+            }
+          }
+        },
+        "hpa": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "minReplicas": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxReplicas": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "cpuUtilization": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Target average CPU, percent of requests. Default 80."
+            }
+          },
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          },
+          "then": {
+            "required": [
+              "maxReplicas"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

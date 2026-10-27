@@ -1,0 +1,37 @@
+suite: service
+values:
+  - values/app.yaml
+templates:
+  - templates/service.yaml
+tests:
+  - it: renders a ClusterIP Service per component on the component's port
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.type
+          value: ClusterIP
+      - equal:
+          path: spec.ports[0]
+          value:
+            name: http
+            port: 4173
+            targetPort: http
+            protocol: TCP
+        documentSelector:
+          path: metadata.name
+          value: web
+
+  - it: rejects a Service type in values
+    set:
+      components.api.service.type: LoadBalancer
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'service' not allowed"
+
+  - it: rejects a type field on a component
+    set:
+      components.api.type: NodePort
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'type' not allowed"

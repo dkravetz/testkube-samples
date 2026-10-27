@@ -1,0 +1,6 @@
+apiVersion: v2
+name: base-app
+description: Runs an app on the platform from its values. Argo CD renders it from git; it is never published.
+type: application
+# Argo CD renders the chart at the same revision as the app's code, so the version never changes.
+version: 0.1.0
