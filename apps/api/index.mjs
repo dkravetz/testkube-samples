@@ -8,6 +8,9 @@ const PORT = 8080;
 
 const DB_HOST = process.env["DB_HOST"] ?? "localhost";
 const DB_PORT = process.env["DB_PORT"] ?? 15432;
+const DB_NAME = process.env["DB_NAME"] ?? "api-db";
+const DB_USER = process.env["DB_USER"] ?? "api-user";
+const DB_PASSWORD = process.env["DB_PASSWORD"] ?? "api-password";
 
 export const app = express();
 app.use(cors());
@@ -24,7 +27,7 @@ app.get("/hello-pg", async (_, response) => {
     console.log("GET /hello-pg");
 
     const client = new pg.Client({
-      connectionString: `postgres://api-user:api-password@${DB_HOST}:${DB_PORT}/api-db`,
+      connectionString: `postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}`,
     });
     await client.connect();
 

@@ -33,8 +33,10 @@ components:
         type: cypress
         path: apps/web
 
-# Per env, merged over `components`.
+# The envs this app runs in, each merged over `components`. Argo CD deploys one Application per
+# env, at its `revision` (a git ref, default main).
 envs:
+  dev: {}
   prd:
     # Testkube tests dev only; prd runs a revision that already passed there.
     tests: false
