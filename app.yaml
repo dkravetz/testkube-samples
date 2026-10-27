@@ -1,0 +1,5 @@
+# How this app runs on the platform. Merged to main = dev; a GitHub release = prd.
+infrastructure:
+  # OpenTofu for the app's cloud resources, applied by the platform's Terrakube workspaces
+  # testkube-samples-dev and testkube-samples-prd.
+  path: infrastructure
