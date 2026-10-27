@@ -1,11 +1,16 @@
 # How this app runs on the platform, the one file the team edits. Merged to main = dev; a GitHub
-# release = prd. Terrakube reads `infrastructure`; Argo CD passes the whole file to the platform's
-# base-app chart (chart/), whose values.schema.json lists every field.
+# release = prd. Terrakube reads `infrastructure.path`, and the OpenTofu there reads
+# `infrastructure.vars`; Argo CD passes the whole file to the base-app chart (chart/), whose
+# values.schema.json lists every field.
 
 infrastructure:
   # OpenTofu for the app's cloud resources, applied by the platform's Terrakube workspaces
   # testkube-samples-dev and testkube-samples-prd.
   path: infrastructure
+  # Variables for that OpenTofu, for every env; envs.<env>.infrastructure.vars wins. Unset ones
+  # use infrastructure/modules/postgres defaults (db.t4g.micro, 20 GiB). Known keys:
+  # db_instance_class, db_allocated_storage.
+  vars: {}
 
 components:
   api:
@@ -42,6 +47,11 @@ envs:
     revision: ">=0.1.0"
     # Testkube tests dev only; prd runs a revision that already passed there.
     tests: false
+    # A bigger database than dev's defaults.
+    infrastructure:
+      vars:
+        db_instance_class: db.t4g.small
+        db_allocated_storage: 50
     components:
       api:
         replicas: 2

@@ -66,10 +66,14 @@
     },
     "infrastructure": {
       "type": "object",
-      "description": "Read by Terrakube: where the app's OpenTofu is. Ignored by the chart.",
+      "description": "Read by Terrakube (path) and the app's OpenTofu (vars). Ignored by the chart.",
+      "additionalProperties": false,
       "properties": {
         "path": {
           "type": "string"
+        },
+        "vars": {
+          "$ref": "#/definitions/infrastructureVars"
         }
       }
     },
@@ -105,6 +109,16 @@
               "$ref": "#/definitions/componentFields"
             }
           },
+          "infrastructure": {
+            "type": "object",
+            "description": "This env's variables for the app's OpenTofu, merged over infrastructure.vars. Ignored by the chart.",
+            "additionalProperties": false,
+            "properties": {
+              "vars": {
+                "$ref": "#/definitions/infrastructureVars"
+              }
+            }
+          },
           "revision": {
             "type": "string",
             "description": "The git ref this env runs, or a semver range over its tags such as \">=0.1.0\" (Argo CD's ApplicationSet reads it from app.yaml on main). Default main."
@@ -118,6 +132,17 @@
     }
   },
   "definitions": {
+    "infrastructureVars": {
+      "type": "object",
+      "description": "Variables for the app's OpenTofu (infrastructure/main.tf lists the known keys and fails the plan on any other).",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
+      }
+    },
     "dnsLabel": {
       "type": "string",
       "pattern": "^[a-z]([-a-z0-9]{0,30}[a-z0-9])?$"

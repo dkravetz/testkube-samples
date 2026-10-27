@@ -114,3 +114,24 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "additional properties 'api' not allowed"
+
+  - it: accepts the app's OpenTofu variables and ignores them
+    values:
+      - values/prd.yaml
+    set:
+      infrastructure.vars:
+        db_instance_class: db.t4g.micro
+      envs.prd.infrastructure.vars:
+        db_instance_class: db.t4g.small
+        db_allocated_storage: 50
+    template: templates/deployment.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: rejects an unknown key under an env's infrastructure
+    set:
+      envs.dev.infrastructure.size: large
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'size' not allowed"
