@@ -34,25 +34,3 @@ module "database" {
   instance_class    = lookup(local.infrastructure_vars, "db_instance_class", null)
   allocated_storage = lookup(local.infrastructure_vars, "db_allocated_storage", null)
 }
-
-# The resources lived in this root before the module; the existing databases move instead of
-# being re-created with a new password.
-moved {
-  from = module.security_group
-  to   = module.database.module.security_group
-}
-
-moved {
-  from = random_password.db
-  to   = module.database.random_password.db
-}
-
-moved {
-  from = module.db
-  to   = module.database.module.db
-}
-
-moved {
-  from = module.db_secret
-  to   = module.database.module.db_secret
-}
