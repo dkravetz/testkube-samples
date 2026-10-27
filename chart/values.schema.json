@@ -105,6 +105,10 @@
               "$ref": "#/definitions/componentFields"
             }
           },
+          "revision": {
+            "type": "string",
+            "description": "The git ref this env runs (Argo CD's ApplicationSet reads it from app.yaml on main). Default main."
+          },
           "tests": {
             "type": "boolean",
             "description": "Render this env's TestWorkflows. Default true."
