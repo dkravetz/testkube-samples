@@ -73,3 +73,20 @@ tests:
       components.api.route.path: api
     asserts:
       - failedTemplate: {}
+
+  - it: links each route's browser URL in Argo CD
+    values:
+      - values/prd.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["link.argocd.argoproj.io/external-link"]
+          value: http://example.prd.localhost/api
+        documentSelector:
+          path: metadata.name
+          value: api
+      - equal:
+          path: metadata.annotations["link.argocd.argoproj.io/external-link"]
+          value: http://example.prd.localhost/
+        documentSelector:
+          path: metadata.name
+          value: web
