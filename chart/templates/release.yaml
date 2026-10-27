@@ -18,6 +18,8 @@ metadata:
   name: github-app
   labels:
     {{- include "app.labels" (dict "root" $ "name" "release") | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1" # see externalsecret.yaml
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -37,6 +39,8 @@ metadata:
   name: github
   labels:
     {{- include "app.labels" (dict "root" $ "name" "release") | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1" # see externalsecret.yaml
 spec:
   appIDRef:
     name: github-app
@@ -61,6 +65,8 @@ metadata:
   name: github-token
   labels:
     {{- include "app.labels" (dict "root" $ "name" "release") | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1" # see externalsecret.yaml
 spec:
   refreshInterval: 30m
   target:
