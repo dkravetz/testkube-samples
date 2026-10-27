@@ -3,7 +3,7 @@ import testkubeLogo from "./assets/testkube.svg";
 import reactLogo from "./assets/react.svg";
 import "./App.css";
 
-const API_ORIGIN = "http://localhost:8080";
+const API_ORIGIN = `${window.location.origin}/api`;
 
 function App() {
   return (
@@ -57,7 +57,7 @@ function HelloServer() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const url = new URL("hello", API_ORIGIN);
+    const url = new URL(`${API_ORIGIN}/hello`);
     if (name) {
       url.searchParams.append("name", name);
     }
